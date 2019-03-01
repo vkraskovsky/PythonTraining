@@ -56,7 +56,7 @@ class StudentTXT(Search):
 #         self.gender = gender
 #         self.age = age
 #
-#         
+#
 # class StudentUtil:
 #     @staticmethod
 #     def read_json():
