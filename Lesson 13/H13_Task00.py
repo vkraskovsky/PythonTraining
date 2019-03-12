@@ -34,6 +34,7 @@
 
 import json
 import uuid
+from datetime import datetime
 
 
 class WorkJSON:
@@ -74,18 +75,25 @@ class Player(WorkJSON):
         self.data = {"player_id": self.player_id, "name": self.name, "team": self.team}
 
 
-class Match(WorkJSON):
+class Match:
+    match_instances = []
 
-    def __init__(self, match_id, date, location, result, team1, team2):
-        WorkJSON.__init__(self)
+    def __init__(self, team0, team1, match_id, date, location, result):
+        self.__class__.match_instances.append(self)
         self.match_id = match_id
         self.date = date
         self.location = location
         self.result = result
+        self.team0 = team0
         self.team1 = team1
-        self.team2 = team2
-        self.players = team1.players + team2.players
-        self.filename = '/home/slava/dev/Temp/H13_Task00/matches.json'
+        self.players = team0.players + team1.players
+        # self.filename = '/home/slava/dev/Temp/H13_Task00/matches.json'
+
+    def __str__(self):
+        return 'Date: {}  Location: {}\n' \
+               'Teams: {} vs {} Result: {}\n' \
+               'Players: {}'.format(self.date, self.location, self.team0.name, self.team1.name, self.result,
+                                    ', '.join([player.name for player in self.players]))
 
 
 def add_players():
@@ -107,32 +115,35 @@ def add_teams():
     return new_team
 
 
-def add_matches():
-    match_id = str(uuid.uuid4())[:4]
-    date = input('Enter date (dd.mm.yyyy):').strip()
-    location = input('Enter location:').strip()
-    result = input('Enter match result:').strip()
-    team1 = input('Enter the first team:').strip()
-    team2 = input('Enter the second team:').strip()
-
-    new_match = Match(match_id, date, location, result, team1, team2)
-    return new_match
+# def add_matches():
+#     match_id = str(uuid.uuid4())[:4]
+#     date = input('Enter date (dd.mm.yyyy):').strip()
+#     location = input('Enter location:').strip()
+#     result = input('Enter match result:').strip()
+#     team1 = input('Enter the first team:').strip()
+#     team2 = input('Enter the second team:').strip()
+#
+#     new_match = Match(match_id, date, location, result, team1, team2)
+#     return new_match
 
 
 def init_instances():
     teams_file = '/home/slava/dev/Temp/H13_Task00/teams.json'
     players_file = '/home/slava/dev/Temp/H13_Task00/players.json'
     matches_file = '/home/slava/dev/Temp/H13_Task00/matches.json'
+
     teams_list = []
     with open(teams_file, 'r') as teams_:
         for line in teams_:
             team_data = json.loads(line)
-            print(team_data)
+            # print(team_data)
             teams_list.append(Team(team_data["team_id"], team_data["name"]))
-    print(teams_list)
+    # print(teams_list)
+
     players_list = []
-    created_teams_ids = [inst.name for inst in teams_list]
-    print(created_teams_ids)
+    created_teams_ids = [inst.team_id for inst in teams_list]
+    # print(created_teams_ids)
+
     with open(players_file, 'r') as players_:
         for line in players_:
             player_data = json.loads(line)
@@ -144,17 +155,43 @@ def init_instances():
         for player in players_list:
             if team is player.team:
                 team.players.append(player)
-                print(team.name, player.name)
+                # print(team.name, player.name)
 
     matches_list = []
-    # with open
+
+    with open(matches_file, 'r') as matches_:
+        for line in matches_:
+            match = json.loads(line)
+            match_teams = [teams_list[created_teams_ids.index(team_id)]
+                           for team_id in [match.pop(team_id) for team_id in ('team0', 'team1')]]
+            matches_list.append(Match(*match_teams, **match))
+    return matches_list
 
 
-  def main():
-
+def search(matches):
+    match_dates = [match.date for match in matches]
     while True:
-        add_matches()
+        search_dates = input('Enter criteria: date, period or "c" - to exit').strip().split()
+        try:
+            if search_dates[0] == 'c':
+                break
+            elif len(search_dates) == 1:
+                date = datetime.strptime(search_dates[0], '%d.%m.%Y')
+                print(date)
+                for i, match_date in enumerate(match_dates):
+                    if datetime.strptime(match_date, '%d.%m.%Y') == date:
+                        print(matches[i])
+        except Exception as err:
+            print('Wrong input', err)
+            continue
 
+
+def main():
+    a = init_instances()
+    search(a)
+
+    # while True:
+    #     add_matches()
 
 
 if __name__ == '__main__':
