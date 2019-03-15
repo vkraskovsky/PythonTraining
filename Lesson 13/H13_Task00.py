@@ -91,7 +91,6 @@ class Match:
         self.team0 = team0
         self.team1 = team1
         self.players = team0.players + team1.players
-        self.filename = matches_file
 
     def __str__(self):
         return 'Date: {}  Location: {}\n' \
@@ -106,32 +105,25 @@ def existing_teams():
         return existing_teams_list
 
 
-# def check_team(existing_teams_, team_name):
-#     while True:
-#         if re.match('^[A-Za-z0-9_-]*$', team_name) and team_name not in [team["name"] for team in existing_teams_]:
-#             return True
-#         else:
-#             print('Wrong input or team already exists...')
-#             return False
-
-
 def add_players(existing_teams_):
     team_name = input('Enter player team:').strip()
-    if team_name in [team["name"] for team in existing_teams_]:
-        player_name = input('Enter player name:').strip()
-        if re.match('^[A-Za-z -]*$', player_name):
-            player_id = str(uuid.uuid4())[:4]
-            new_player = Player(player_id, player_name, team_name)
-            new_player.to_json()
-            print('Successfully added new player: ', player_name, 'to team', team_name)
-            return new_player
+    for team in existing_teams_:
+        if team_name == team["name"]:
+            team_id = team["team_id"]
+            player_name = input('Enter player name:').strip()
+            if re.match('^[A-Za-z -]*$', player_name):
+                player_id = str(uuid.uuid4())[:4]
+                new_player = Player(player_id, player_name, team_id)
+                new_player.to_json()
+                print('Successfully added new player: ', player_name, 'to team', team_name)
+                return new_player
+            else:
+                print('Player was not added...\n Reason: wrong input...')
+                return None
         else:
-            print('Player was not added...\n Reason: wrong input...')
-            return None
-
-    else:
-        print('Team does not exist. Exiting...')
-        return None
+            continue
+    print('Team does not exist. Exiting...')
+    return None
 
 
 def add_teams(existing_teams_):
@@ -144,6 +136,49 @@ def add_teams(existing_teams_):
         return new_team
     else:
         print('Team was not added...\n Reason: wrong input or team already exists...')
+        return None
+
+
+def add_matches(existing_teams_):
+    team1_name = input('Enter the first team:').strip()
+    team1_id = False
+    team2_id = False
+    for team1 in existing_teams_:
+        if team1_name == team1["name"]:
+            team1_id = team1["team_id"]
+
+            team2_name = input('Enter the second team:').strip()
+            for team2 in existing_teams_:
+                if team2_name == team2["name"]:
+                    team2_id = team2["team_id"]
+
+    if team1_id and team2_id:
+        date = input('Enter date (dd.mm.yyyy):').strip()
+        try:
+            datetime.strptime(date, '%d.%m.%Y')
+            location = input('Enter location:').strip()
+            if re.match('^[A-Za-z0-9_-]*$', location):
+                result = input('Enter match result:').strip()
+                if re.match('^[0-9:]*$', result):
+                    match_id = str(uuid.uuid4())[:4]
+                    new_match = {"team0": team1_id, "team1": team2_id, "match_id": match_id, "date": date,
+                                 "location": location, "result": result}
+                    with open(matches_file, 'a') as file:
+                        data = json.dumps(new_match) + '\n'
+                        file.write(data)
+
+                    return new_match
+
+                else:
+                    print('Wrong value for result..')
+            else:
+                print('Wrong value for location...')
+
+        except Exception as date_error:
+            print('Wrong input', date_error)
+
+    else:
+        print('Team does not exist. Exiting...')
         return None
 
 
@@ -166,21 +201,10 @@ def add_data():
 
         elif data_to_add_choice == '3':
             print('Let\'s add a match...')
+            add_matches(existing_teams_list)
 
     else:
         print('Wrong choice to add!')
-
-
-# def add_matches():
-#     match_id = str(uuid.uuid4())[:4]
-#     date = input('Enter date (dd.mm.yyyy):').strip()
-#     location = input('Enter location:').strip()
-#     result = input('Enter match result:').strip()
-#     team1 = input('Enter the first team:').strip()
-#     team2 = input('Enter the second team:').strip()
-#
-#     new_match = Match(match_id, date, location, result, team1, team2)
-#     return new_match
 
 
 def init_instances():
@@ -188,13 +212,11 @@ def init_instances():
     with open(teams_file, 'r') as teams_:
         for line in teams_:
             team_data = json.loads(line)
-            # print(team_data)
+
             teams_list.append(Team(team_data["team_id"], team_data["name"]))
-    # print(teams_list)
 
     players_list = []
     created_teams_ids = [inst.team_id for inst in teams_list]
-    # print(created_teams_ids)
 
     with open(players_file, 'r') as players_:
         for line in players_:
@@ -207,7 +229,6 @@ def init_instances():
         for player in players_list:
             if team is player.team:
                 team.players.append(player)
-                # print(team.name, player.name)
 
     matches_list = []
 
@@ -223,24 +244,25 @@ def init_instances():
 def search(matches):
     match_dates = [match.date for match in matches]
 
-    search_dates = input('Enter criteria: date, period or "c" - to exit').strip().split()
+    search_dates = input('Enter criteria: date or period').strip().split()
     try:
         if len(search_dates) == 1:
             date = datetime.strptime(search_dates[0], '%d.%m.%Y')
             for i, match_date in enumerate(match_dates):
                 if datetime.strptime(match_date, '%d.%m.%Y') == date:
-                    print(matches[i])
+                    print('\n', matches[i], '\n')
 
         elif len(search_dates) == 2:
             date0, date1 = datetime.strptime(search_dates[0], '%d.%m.%Y'), \
                            datetime.strptime(search_dates[1], '%d.%m.%Y')
-            print(date0, date1)
             if date0 > date1:
                 print("Wrong period - last date is earlier than the first one...")
             else:
                 for i, match_date in enumerate(match_dates):
                     if date0 <= datetime.strptime(match_date, '%d.%m.%Y') <= date1:
-                        print(matches[i])
+                        print('\n', matches[i], '\n')
+        else:
+            print('Wrong input...')
 
     except Exception as date_error:
         print('Wrong input', date_error)
