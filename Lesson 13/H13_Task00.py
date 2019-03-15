@@ -34,7 +34,12 @@
 
 import json
 import uuid
+import re
 from datetime import datetime
+
+teams_file = 'teams.json'
+players_file = 'players.json'
+matches_file = 'matches.json'
 
 
 class WorkJSON:
@@ -45,7 +50,6 @@ class WorkJSON:
     def to_json(self):
         with open(self.filename, 'a') as file:
             data = json.dumps(self.data) + '\n'
-            print(data)
             file.write(data)
 
     def from_json(self):
@@ -61,7 +65,7 @@ class Team(WorkJSON):
         self.team_id = team_id
         self.name = name
         self.players = []
-        self.filename = '/home/slava/dev/Temp/H13_Task00/teams.json'
+        self.filename = teams_file
         self.data = {"team_id": self.team_id, "name": self.name}
 
 
@@ -71,7 +75,7 @@ class Player(WorkJSON):
         self.player_id = player_id
         self.name = name
         self.team = team
-        self.filename = '/home/slava/dev/Temp/H13_Task00/players.json'
+        self.filename = players_file
         self.data = {"player_id": self.player_id, "name": self.name, "team": self.team}
 
 
@@ -87,7 +91,7 @@ class Match:
         self.team0 = team0
         self.team1 = team1
         self.players = team0.players + team1.players
-        # self.filename = '/home/slava/dev/Temp/H13_Task00/matches.json'
+        self.filename = matches_file
 
     def __str__(self):
         return 'Date: {}  Location: {}\n' \
@@ -96,23 +100,75 @@ class Match:
                                     ', '.join([player.name for player in self.players]))
 
 
-def add_players():
-    player_id = str(uuid.uuid4())[:4]
-    name = input('Enter player name:').strip()
-    team = input('Enter player team_id:').strip()
-
-    new_player = Player(player_id, name, team)
-    new_player.to_json()
-    return new_player
+def existing_teams():
+    with open(teams_file, 'r') as file:
+        existing_teams_list = [json.loads(team_data) for team_data in file]
+        return existing_teams_list
 
 
-def add_teams():
+# def check_team(existing_teams_, team_name):
+#     while True:
+#         if re.match('^[A-Za-z0-9_-]*$', team_name) and team_name not in [team["name"] for team in existing_teams_]:
+#             return True
+#         else:
+#             print('Wrong input or team already exists...')
+#             return False
+
+
+def add_players(existing_teams_):
+    team_name = input('Enter player team:').strip()
+    if team_name in [team["name"] for team in existing_teams_]:
+        player_name = input('Enter player name:').strip()
+        if re.match('^[A-Za-z -]*$', player_name):
+            player_id = str(uuid.uuid4())[:4]
+            new_player = Player(player_id, player_name, team_name)
+            new_player.to_json()
+            print('Successfully added new player: ', player_name, 'to team', team_name)
+            return new_player
+        else:
+            print('Player was not added...\n Reason: wrong input...')
+            return None
+
+    else:
+        print('Team does not exist. Exiting...')
+        return None
+
+
+def add_teams(existing_teams_):
     team_id = str(uuid.uuid4())[:4]
     name = input('Enter team name:').strip()
+    if re.match('^[A-Za-z0-9_-]*$', name) and name not in [team["name"] for team in existing_teams_]:
+        new_team = Team(team_id, name)
+        new_team.to_json()
+        print('Successfully added new team:\n', team_id, name)
+        return new_team
+    else:
+        print('Team was not added...\n Reason: wrong input or team already exists...')
+        return None
 
-    new_team = Team(team_id, name)
-    new_team.to_json()
-    return new_team
+
+def add_data():
+    data_to_add_choice = input('What would you like to add:\n'
+                               '1 - Team\n'
+                               '2 - Player\n'
+                               '3 - Match\n')
+    if data_to_add_choice in ('1', '2', '3'):
+
+        existing_teams_list = existing_teams()
+
+        if data_to_add_choice == '1':
+            print('Let\'s add a team...')
+            add_teams(existing_teams_list)
+
+        elif data_to_add_choice == '2':
+            print('Let\'s add a player...')
+            add_players(existing_teams_list)
+
+        elif data_to_add_choice == '3':
+            print('Let\'s add a match...')
+
+    else:
+        print('Wrong choice to add!')
 
 
 # def add_matches():
@@ -128,10 +184,6 @@ def add_teams():
 
 
 def init_instances():
-    teams_file = '/home/slava/dev/Temp/H13_Task00/teams.json'
-    players_file = '/home/slava/dev/Temp/H13_Task00/players.json'
-    matches_file = '/home/slava/dev/Temp/H13_Task00/matches.json'
-
     teams_list = []
     with open(teams_file, 'r') as teams_:
         for line in teams_:
@@ -170,28 +222,53 @@ def init_instances():
 
 def search(matches):
     match_dates = [match.date for match in matches]
-    while True:
-        search_dates = input('Enter criteria: date, period or "c" - to exit').strip().split()
-        try:
-            if search_dates[0] == 'c':
-                break
-            elif len(search_dates) == 1:
-                date = datetime.strptime(search_dates[0], '%d.%m.%Y')
-                print(date)
+
+    search_dates = input('Enter criteria: date, period or "c" - to exit').strip().split()
+    try:
+        if len(search_dates) == 1:
+            date = datetime.strptime(search_dates[0], '%d.%m.%Y')
+            for i, match_date in enumerate(match_dates):
+                if datetime.strptime(match_date, '%d.%m.%Y') == date:
+                    print(matches[i])
+
+        elif len(search_dates) == 2:
+            date0, date1 = datetime.strptime(search_dates[0], '%d.%m.%Y'), \
+                           datetime.strptime(search_dates[1], '%d.%m.%Y')
+            print(date0, date1)
+            if date0 > date1:
+                print("Wrong period - last date is earlier than the first one...")
+            else:
                 for i, match_date in enumerate(match_dates):
-                    if datetime.strptime(match_date, '%d.%m.%Y') == date:
+                    if date0 <= datetime.strptime(match_date, '%d.%m.%Y') <= date1:
                         print(matches[i])
-        except Exception as err:
-            print('Wrong input', err)
-            continue
+
+    except Exception as date_error:
+        print('Wrong input', date_error)
 
 
 def main():
-    a = init_instances()
-    search(a)
+    while True:
 
-    # while True:
-    #     add_matches()
+        user_choice = input('What would you like to do?\n'
+                            '1 - Add data (Team, Player, Match)\n'
+                            '2 - Search matches\n'
+                            '3 - Exit\n')
+
+        if user_choice in ('1', '2', '3'):
+
+            if user_choice == '1':
+                add_data()
+
+            elif user_choice == '2':
+                match_instances_list = init_instances()
+                search(match_instances_list)
+
+            elif user_choice == '3':
+                print('Exiting...')
+                break
+
+        else:
+            print('Wrong choice!')
 
 
 if __name__ == '__main__':
