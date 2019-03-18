@@ -27,4 +27,6 @@ class Match(models.Model):
     score = models.CharField(max_length=5)
 
     def __str__(self):
-        return self.match_date.strftime('%m/%d/%Y') + '-' + self.location + ' ' + self.score
+        return 'Match date: '+ self.match_date.strftime('%m/%d/%Y') + ' Location: ' \
+               + self.location + ' Score: ' + self.score
+        # return self.teams + '-' + self.location + ' ' + self.score
